@@ -1,0 +1,8 @@
+{
+    "name": "method-dish-soap",
+    "version": "1.0.0",
+    "description": "Discord bot to initiate daily progress updates and automatically document said updates on specified Notion page",
+    "main": "main.py",
+    "author": "maangoliebe",
+    "dependencies": {}
+}
