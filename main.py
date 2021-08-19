@@ -1,43 +1,47 @@
+import datetime
 import discord
 from discord.ext import commands, tasks
+
 import auth
-import datetime
+from notion_io import get_from_notion, send_to_notion
+from config import god, test_channel, standup_questions
 
 # allow bot to access member list
 intents = discord.Intents.default()
 intents.members = True
 
+
 # CONSTANTS
-TOKEN = auth.token
+TOKEN = auth.disc_token
 bot = commands.Bot(command_prefix='!', intents=intents)
-server_ids = ["697957942325936149"]
-# after api v1.0 all IDs are int not str
-god = 282973496559009792
 team = [god]
-test_channel = 868199419022041119
+
+
+def check(user):
+    def inner_check(message):
+        return message.author == user
+    return inner_check
 
 async def check_in(user):
+    previous_response = get_from_notion()
     
-    await user.send("Good morning! Time for check-in :sunny:")
+    user_responses = []
+    for question in standup_questions:
+        await user.send(question)
+        msg = await bot.wait_for('message', check=check(user))
+        user_responses.append(msg.content)
     
-    def check(message):
-        return message.author in team
-    
-    msg = await bot.wait_for('message', check=check)
-    await user.send(f"How do you feel today, {msg.author}?")
-    # await user.send("What have you accomplished since yesterday?")
-    # await user.send("What will you do today?")
-    # await user.send("Anything blocking your progress?")
+    send_to_notion(user_responses)
+
+    await user.send("Perfect! Good luck and have a great day :smile:")
+
 
 @bot.event
 async def on_ready():
     for guild in bot.guilds:
         for member in guild.members:
-            if member.id == god:
+            if member.id == god and not member.user.bot:
                 await check_in(member)
-
-    # user = await bot.fetch_user(god)
-    # await user.send("hello")
 
 @bot.command()
 async def members(ctx):
