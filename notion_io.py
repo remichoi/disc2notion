@@ -30,16 +30,27 @@ def locate_month_page():
 
 
 def get_previous_tasks(page):
+    """retrieves last reported tasks and date on given page
+
+    Args:
+        page (Block): PageBlock of month's tasks (TodoBlock) and dates (SubheaderBlock)
+
+    Returns:
+        str * str list tuple: date and list of tasks
+    """
     payload = []
     backwards = list(reversed(list(page.children)))
     for block in backwards:
         if block.type == 'to_do':
-            payload.append(block)
+            payload.append(block.title)
         if block.type == 'sub_header':
+            payload.append(block.title.split("| ")[1]) # save date to check if prompt needs revision
             payload = list(reversed(payload))
-            payload.append( block.title.strip("|")[2] ) # save date to check if prompt needs revision
             break # don't want to go beyond last documented date
-    return payload
+    if payload:
+        return payload[0], payload[1:]
+    else:
+        return None, []
 
 
 def get_from_notion():
@@ -50,20 +61,15 @@ def get_from_notion():
     """
     page = locate_month_page()
 
-    payload = (-1, [])
     if page.children:
-        payload = get_previous_tasks(page)
-        date = payload[0]
-        tasks = payload[1:]
-    else: # new month
-        if home.children[-2]:
-            get_previous_tasks(home.children[-2])
+        date, tasks = get_previous_tasks(page)
+    elif home.children[-2]: # find previous month's last day if previous month exists
+        date, tasks = get_previous_tasks(home.children[-2])
+
     return (date, tasks)
 
 
 def send_to_notion(payload):
-    print("Starting send_to_notion")
-
     page = locate_month_page()
 
     # set up entry
@@ -71,8 +77,8 @@ def send_to_notion(payload):
     page.children.add_new(SubheaderBlock, title=stylized_date, color="red")
     
     # insert q&a's into entry
-    for prompt, item in zip(standup_questions, payload):
-        page.children.add_new(QuoteBlock, title=prompt, color="gray")
+    for prompt, item in zip(standup_questions[1:], payload[1:]):
+        page.children.add_new(QuoteBlock, title=prompt.split(" Y")[0], color="gray")
         if item[0] == "*":
             for action_item in item.split('* ')[1:]:
                 page.children.add_new(
@@ -81,4 +87,3 @@ def send_to_notion(payload):
                 )
         else:
             page.children.add_new(BulletedListBlock, title=item)
-    print("Check Notion!")
